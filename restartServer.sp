@@ -56,12 +56,26 @@ public Action:Restart(Handle:restartHandle){
 	Format(hostIP, sizeof(hostIP), "%d.%d.%d.%d", pieces[0], pieces[1], pieces[2], pieces[3]);
 
 	new port = GetConVarInt(FindConVar("hostport"));
-	new hostname = GetConVarInt(FindConVar("hostname"));
+	
+	new String:hostname[512];
+	GetConVarString(FindConVar("hostname"), hostname, sizeof(hostname));
 
+	decl String:location[12];
+
+	if(pieces[0] = 94)
+	{
+
+		location = "SE";
+	
+	}else if(pieces[0] = 41)
+	{
+
+		location = "ZA";
+	}
 	//Insert game server into database.
 
-	new String:queryInsertHost[100];
-	Format(queryInsertHost, sizeof(queryInsertHost), "SELECT host FROM servers WHERE host = '%s:%i'", hostIP, port);
+	new String:queryInsertHost[1024];
+	Format(queryInsertHost, sizeof(queryInsertHost), "SELECT hostip FROM servers WHERE hostip = '%s:%i'", hostIP, port);
 	new Handle:hQueryInsertHost = SQL_Query(DB, queryInsertHost);
 
 	if (hQueryInsertHost == INVALID_HANDLE)
@@ -79,16 +93,16 @@ public Action:Restart(Handle:restartHandle){
 
 	}else{
 
-	new String:queryAddHost[100];
-	Format(queryAddHost, sizeof(queryAddHost), "INSERT INTO servers (restart, host) VALUES('0', '%s:%i')", hostIP, port);
+	new String:queryAddHost[1024];
+	Format(queryAddHost, sizeof(queryAddHost), "INSERT INTO servers (hostip, hostname, location, restart) VALUES('%s:%i', '%s', '%s', '0')", hostIP, port, hostname, location);
 	new Handle:hQueryAddHost = SQL_Query(DB, queryAddHost);
 	CloseHandle(hQueryInsertHost);
 
 	}
 	}
 
-	new String:queryCheckForUpdate[100];
-	Format(queryCheckForUpdate, sizeof(queryCheckForUpdate), "SELECT host, restart FROM servers WHERE host = '%s:%i' AND restart = '1'", hostIP, port);
+	new String:queryCheckForUpdate[1024];
+	Format(queryCheckForUpdate, sizeof(queryCheckForUpdate), "SELECT hostip, restart FROM servers WHERE hostip = '%s:%i' AND restart = '1'", hostIP, port);
 	new Handle:hQueryCheckForUpdate = SQL_Query(DB, queryCheckForUpdate);
 
 	if (hQueryCheckForUpdate == INVALID_HANDLE)
@@ -118,7 +132,7 @@ public Action:Restart(Handle:restartHandle){
 	if(GetRealClientCount() <= 1 && restart == true){
 
 	new String:queryUpdateRestartValue[100];
-	Format(queryUpdateRestartValue, sizeof(queryUpdateRestartValue), "UPDATE servers SET restart = '0' WHERE host = '%s:%i'", hostIP, port);
+	Format(queryUpdateRestartValue, sizeof(queryUpdateRestartValue), "UPDATE servers SET restart = '0' WHERE hostip = '%s:%i'", hostIP, port);
 	new Handle:hQueryUpdateRestartValue = SQL_Query(DB, queryUpdateRestartValue);
 	CloseHandle(hQueryUpdateRestartValue);
 
@@ -143,4 +157,3 @@ public Action:Restart(Handle:restartHandle){
 
      return Plugin_Continue;
 }
-
