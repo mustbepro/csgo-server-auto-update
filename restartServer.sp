@@ -62,12 +62,12 @@ public Action:Restart(Handle:restartHandle){
 
 	decl String:location[12];
 
-	if(pieces[0] = 94)
+	if(pieces[0] == 94)
 	{
 
 		location = "SE";
 	
-	}else if(pieces[0] = 41)
+	}else if(pieces[0] == 41)
 	{
 
 		location = "ZA";
