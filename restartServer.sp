@@ -36,124 +36,103 @@ stock GetRealClientCount(bool:inGameOnly = true){
 
 public Action:Restart(Handle:restartHandle){
 
-	//Find game server IP.
-
-	if(DB == INVALID_HANDLE)
-	{
+	if(DB == INVALID_HANDLE){
 
 		return Plugin_Stop;
 	}
 
+	//extract game-server: IP, PORT, hostname
 	decl String:hostIP[32];
 	new pieces[4];
 	new longip = GetConVarInt(FindConVar("hostip"));
-
 	pieces[0] = (longip >> 24) & 0x000000FF;
 	pieces[1] = (longip >> 16) & 0x000000FF;
 	pieces[2] = (longip >> 8) & 0x000000FF;
 	pieces[3] = longip & 0x000000FF;
-
 	Format(hostIP, sizeof(hostIP), "%d.%d.%d.%d", pieces[0], pieces[1], pieces[2], pieces[3]);
-
 	new port = GetConVarInt(FindConVar("hostport"));
-	
 	new String:hostname[512];
 	GetConVarString(FindConVar("hostname"), hostname, sizeof(hostname));
-
 	decl String:location[12];
 
-	if(pieces[0] == 94)
-	{
+	if(pieces[0] == 94){
 
 		location = "SE";
 	
-	}else if(pieces[0] == 41)
-	{
+	}else if(pieces[0] == 41){
 
 		location = "ZA";
 	}
-	//Insert game server into database.
-
-	new String:queryInsertHost[1024];
-	Format(queryInsertHost, sizeof(queryInsertHost), "SELECT hostip FROM servers WHERE hostip = '%s:%i'", hostIP, port);
-	new Handle:hQueryInsertHost = SQL_Query(DB, queryInsertHost);
-
-	if (hQueryInsertHost == INVALID_HANDLE)
-	{
 	
-	new String:error[255]
-	SQL_GetError(DB, error, sizeof(error))
-	PrintToServer("Failed to query (error: %s)", error)
+	//If server does not exist in db, insert
+	new String:queryFindHost[1024];
+	Format(queryFindHost, sizeof(queryFindHost), "SELECT hostip FROM servers WHERE hostip = '%s:%i'", hostIP, port);
+	new Handle:hQueryFindHost = SQL_Query(DB, queryFindHost);
+
+	if (hQueryFindHost == INVALID_HANDLE){
+		
+		new String:error[255]
+		SQL_GetError(DB, error, sizeof(error))
+		PrintToServer("Failed to query (error: %s)", error)
 	
 	}else{
 
-	if(SQL_GetRowCount(hQueryInsertHost) != 0){
+		if(SQL_GetRowCount(hQueryFindHost) == 0){
 
-	CloseHandle(hQueryInsertHost);
+			new String:queryAddHost[1024];
+			Format(queryAddHost, sizeof(queryAddHost), "INSERT INTO servers (hostip, hostname, location, restart) VALUES('%s:%i', '%s', '%s', '0')", hostIP, port, hostname, location);
+			new Handle:hQueryAddHost = SQL_Query(DB, queryAddHost);
+			CloseHandle(hQueryFindHost);
 
-	}else{
+		}else{
 
-	new String:queryAddHost[1024];
-	Format(queryAddHost, sizeof(queryAddHost), "INSERT INTO servers (hostip, hostname, location, restart) VALUES('%s:%i', '%s', '%s', '0')", hostIP, port, hostname, location);
-	new Handle:hQueryAddHost = SQL_Query(DB, queryAddHost);
-	CloseHandle(hQueryInsertHost);
-
+			CloseHandle(hQueryFindHost);
+		}
 	}
-	}
 
+	//If restart is required, set server password and change hostname 
 	new String:queryCheckForUpdate[1024];
 	Format(queryCheckForUpdate, sizeof(queryCheckForUpdate), "SELECT hostip, restart FROM servers WHERE hostip = '%s:%i' AND restart = '1'", hostIP, port);
 	new Handle:hQueryCheckForUpdate = SQL_Query(DB, queryCheckForUpdate);
 
-	if (hQueryCheckForUpdate == INVALID_HANDLE)
-	{
+	if (hQueryCheckForUpdate == INVALID_HANDLE){
 	
-	new String:error[255]
-	SQL_GetError(DB, error, sizeof(error))
-	PrintToServer("Failed to query (error: %s)", error)
+		new String:error[255]
+		SQL_GetError(DB, error, sizeof(error))
+		PrintToServer("Failed to query (error: %s)", error)
 	
-	}else{
+	}else if(SQL_GetRowCount(hQueryCheckForUpdate) != 0){
 
-	if(SQL_GetRowCount(hQueryCheckForUpdate) != 0){
-
-	restart = true;
-
-	ServerCommand("sv_password UPDATIN");
-	ServerCommand("hostname CS:GO Server Update Initiated - 8FRAG");
-	CloseHandle(hQueryCheckForUpdate);
+		restart = true;
+		ServerCommand("sv_password UPDATIN");
+		ServerCommand("hostname Lockdown: CS:GO Server Update Initiated");
+		CloseHandle(hQueryCheckForUpdate);
 	
 	}else{
 	
-	restart = false;
-
+		restart = false;
 	}
-	}
-
+	
+	//Restart server
 	if(GetRealClientCount() <= 1 && restart == true){
 
-	new String:queryUpdateRestartValue[100];
-	Format(queryUpdateRestartValue, sizeof(queryUpdateRestartValue), "UPDATE servers SET restart = '0' WHERE hostip = '%s:%i'", hostIP, port);
-	new Handle:hQueryUpdateRestartValue = SQL_Query(DB, queryUpdateRestartValue);
-	CloseHandle(hQueryUpdateRestartValue);
+		new String:queryUpdateRestartValue[100];
+		Format(queryUpdateRestartValue, sizeof(queryUpdateRestartValue), "UPDATE servers SET restart = '0' WHERE hostip = '%s:%i'", hostIP, port);
+		new Handle:hQueryUpdateRestartValue = SQL_Query(DB, queryUpdateRestartValue);
+		CloseHandle(hQueryUpdateRestartValue);
+		restart = false;
 
-	restart = false;
-
-	for( new i = 1; i <= GetMaxClients(); i++ ){
+		for( new i = 1; i <= GetMaxClients(); i++ ){
 		
-		if(i <= 1)
-		{
+			if(i <= 1){
+				
+				ServerCommand("_restart");
+			
+			}else{
 
-			ServerCommand("_restart");
-		}else{
-
-			KickClient(i, "Server Restarting... CS:GO Update");
-			ServerCommand("_restart");
+				KickClient(i, "Server Restarting... CS:GO Update");
+				ServerCommand("_restart");
+			}
 		}
-	}
-	}else{
-
-		//do nothing
-	}
-
      return Plugin_Continue;
 }
